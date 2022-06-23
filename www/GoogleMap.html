@@ -1,0 +1,36 @@
+<div container='MapZone_Main'><iframe id="mapZone" style="z-index:999999;top:0px; left:0px; position:fixed; width:98%; height:98%"></iframe><button style='position:fixed; top:0px; right:0px;z-index:9999999;' act="CloseMap" type="button">X</button>
+    </div>
+ 
+<script>
+    FilterOption['Map'] = new Object()
+    $("#mapZone").attr("src", mapUrl);
+    
+    
+    $('[act="CloseMap"]').on({click:function() {
+        
+         
+        
+                                                    var fieldID = $("#main1").attr("fieldid");
+                                            var sectionID = $("#main1").attr("sectionid");
+                                            var pageID = $("#main1").attr("pageid");
+                                            
+                                            
+        console.log( $("#mapZone").attr("src" ) );
+        
+        /*
+        FilterOption[98].map.extent.xmin + ((FilterOption[98].map.extent.xmax-FilterOption[98].map.extent.xmin)/2)
+        FilterOption[98].map.extent.ymin + ((FilterOption[98].map.extent.ymax-FilterOption[98].map.extent.ymin)/2)
+        */
+                                                $("[container='MapZone_Main']").hide();
+                                                
+                                               } }); 
+    
+    
+    $("#mapZone").css("width", (window.innerWidth-10));
+    $("#mapZone").css("height",( window.innerHeight-10));
+     
+    function MapInited(){    
+    }
+    
+     
+</script>

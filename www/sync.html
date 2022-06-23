@@ -1,0 +1,416 @@
+<!--- This file will display the data to be synced -->
+
+<div class="pull-right">
+    <button act='Refresh' class="btn blue" type="button"><i class="fa fa-refresh"></i> Refresh</button>
+    <button act='Logout' class="btn red" type="button"><i class="fa fa-lock"></i> Log out</button>
+</div>
+
+<br />
+<div class="row" style="margin:0px">
+    <div class="form-horizontal form-basic">
+        <h2>Sync Operations</h2>
+        <div>
+            <span></span>
+            <table class="table" >
+                <thead>
+                    <tr>
+                        <th style="font-weight: bold; text-align: center;">Form Name</th>
+                        <th style="font-weight: bold; text-align: center;">Date Created</th>
+                    </tr>
+                </thead>
+                <tbody  style="font-weight: normal;" id="tblInsertOperations"></tbody>
+            </table>
+            
+ 
+            <table id="tblEdits"></table>
+
+            <p lbl='SyncImages' style="display:none;">Number of images: 0</p>
+            
+            <br/>
+            <p lbl='SyncMessage'>Click <b>Submit</b> below to sync your edits with the server</p>
+           <!--  <button class="btn red" act="ClearLocalS">Clear Sync Log</button> &nbsp; -->
+            <button class="btn blue" act="ExecuteSync">Submit</button>
+            <br /><br />
+            <div id="divStatus"></div>
+        </div>
+
+    </div>
+</div>
+<div container='ShowDebugInfo'>
+<p>&nbsp;<br/>&nbsp;<br/>&nbsp;</p>
+    </div>
+<hr />
+<div class="row" style="margin:0px;">
+    <div class="col-sm-12" style=" display:none;" container='face_enroll'>
+    </div>
+</div>
+<hr />
+<div container='DebugInformationSection' style="display:none">
+    <table class="table table-stripped">
+        <thead>
+            <tr>
+                <td></td>
+                <td></td>
+            </tr>
+
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    Current Version
+                </td>
+                <td><span lbl="CurrentVersion"></span></td>
+            </tr>
+            <tr>
+                <td>
+                    Connected Server
+                </td>
+                <td><span lbl="ConnectedServer"></span></td>
+            </tr>
+            <tr>
+                <td>
+                   Last Connection to Server
+                </td>
+                <td><span lbl="LastConnectedServer"></span></td>
+            </tr>
+        </tbody>
+ 
+
+    </table>
+  <!--   <a href="http://ghdevvmsrv03.giscoe.com/giscoebuilder.html">Download update</a>  -->
+</div>
+
+<script>
+    GetPosition();
+    
+    $("[container='ShowDebugInfo']").on({ click:function() {
+        $("[container='DebugInformationSection']").show();
+    }})
+    
+    
+    /*
+     db.transaction(function(tx) {
+    tx.executeSql('SELECT count(*) AS mycount FROM PHOTOS', [], function(tx, rs) {
+        
+        $('[lbl="SyncImages"]').html("Number of Photos to Upload: " + rs.rows.item(0).mycount);
+        
+    }, function(tx, error) {
+      console.log('SELECT error: ' + error.message);
+    });
+  });
+    */
+    $('[lbl="CurrentVersion"]').html(ApplicationInformation.ApplicationVersion);
+    $('[lbl="ConnectedServer"]').html(ApplicationInformation.ConnectedServer);
+    $('[lbl="LastConnectedServer"]').html(ApplicationInformation.LastConnectedDate);
+    
+
+    if(ISFACEAUTH)
+    {
+        $("[container='face_enroll']").show();
+    }
+    
+    $("#divStatus").html("")
+    // On load: Load all the local storage cache
+
+    
+    if(ApplicationInformation.FaceAuthString == undefined)
+    {
+        
+    $("[container='face_enroll']").append(
+        $("<button>")
+            .attr("class", "btn btn-primary")
+            .text("Enroll FaceAuth")
+            .on({ click:function() {
+                    SetupZoom();
+                }
+            })
+        );
+    }
+    else{
+        $("[container='face_enroll']").html("Face Authentication Completed.");
+    }
+
+    $("[act='Refresh']").on({
+        click: function () {
+            InitAppConfig();
+            $("[container='WorkWindow']").hide('fast', function () {
+
+                $("#SyncPanel").hide();
+            });
+        }
+    });
+
+    $("[act='Logout']").on({
+        click: function () {
+            SYNC_Logout();
+            $("#SyncPanel").hide();
+
+            return;
+
+            // First Temp to logout
+            syncOperationsLayer = new Object();
+            syncOperationsLayer.InsertLayer = new Array();
+            syncOperationsLayer.InsertLayerFields = new Array();
+
+            localStorage.setItem("syncOperationsLayer", JSON.stringify(syncOperationsLayer));
+            localStorage.setItem("SQLOfflineData", JSON.stringify(new Array()));
+            loggedinuser = undefined;
+            localStorage.setItem("LocalUser", loggedinuser);
+            $("#switchApplication").hide();
+            $("#loginSection").load("login.html");
+            $("[container='WorkWindow']").hide('fast', function () { $("#loginSection").show('fast'); });
+        }
+    });
+
+    $('[act="ClearLocalS"]').on({
+        click: function () {
+            syncOperationsLayer = new Object();
+            dbPhotos.nuke();
+            
+             db.transaction(function (tx) {
+                tx.executeSql('DROP TABLE PHOTOS');
+                tx.executeSql('CREATE TABLE PHOTOS (ImageName, ImageData, ImageDetails)');
+            }, function (error) {
+               alert('TRUNCATE ERROR: ' + error.message);
+            }, function () {
+                //alert("Database was cleared");
+            });
+            
+             FilterOption["Images"] = Array();
+            RecreateStorage();            
+            OnLoad();
+
+            $("#divStatus").html("Sync Storage Has Been Cleared");
+            
+        }
+    });
+
+
+    $('[act="ExecuteSync"]').on({
+        click: function () {
+            $("[lbl='SyncMessage']").html("Syncing... Please wait...");
+            $(this).attr("disabled", "disabled");
+            PerformSyncOperation();
+        }
+    });
+
+    function OnLoad() {
+        //Clean out DT
+        $("#tblInsertOperations").html("");
+        // Show Storage
+        for (var xLayers = 0; xLayers < syncOperationsLayer.InsertLayer.length; xLayers++) {
+            var C = 0;
+            for (var xC = 0; xC < syncOperationsLayer.InsertLayerFields.length; xC++) {
+                if (syncOperationsLayer.InsertLayerFields[xC].UniqeID == syncOperationsLayer.InsertLayer[xLayers].UniqeID)
+                    C++;
+            }
+
+            $("#tblInsertOperations").append(
+                $("<tr>").append(
+                    $("<td>")
+                        .html(syncOperationsLayer.InsertLayer[xLayers].FormName)
+                ).append(
+                    $("<td>")
+                        .html(syncOperationsLayer.InsertLayer[xLayers].DateInserted)
+                )
+            );
+        }
+    }
+
+
+    var iCurImage =0;
+    
+    function SyncImage(){
+        iCurImage++;
+        
+        if(iCurImage < FilterOption["Images"].length)
+            SyncImages();
+        else
+        {
+            //alert("done");
+           if(dbPhotos!=undefined) dbPhotos.nuke();
+            
+			 if(dbPhotos!=db)
+            db.transaction(function (tx) {
+                tx.executeSql('DROP TABLE PHOTOS');
+                tx.executeSql('CREATE TABLE PHOTOS (ImageName, ImageData, ImageDetails)');
+            }, function (error) {
+               alert('TRUNCATE ERROR: ' + error.message);
+            }, function () {
+                //alert("Database was cleared");
+            });
+            
+             FilterOption["Images"] = Array();
+            PerformSyncOperations();
+        }
+            
+    }
+    
+    function SyncImages()
+    {
+        $("#divStatus").html("");
+        // Loop each image & upload
+
+            //var imageData =   localStorage.getItem("Image." + FilterOption["Images"][x].ImageName);
+        
+        
+    try{
+         db.transaction(function(tx) {
+        tx.executeSql('SELECT * FROM PHOTOS', [], function(tx, rs) {
+                
+            photData = rs.rows.item(iCurImage);      
+
+        
+           {
+                {
+                        var x = iCurImage;
+           var imageData = photData.ImageData;
+                 
+            $.ajax(
+            {
+                type: "POST",
+                dataType: 'json',
+                contentType: "application/json; charset=utf-8",
+                url: serverUrl + "WebServices/Offline/SyncService.asmx/UploadImage",
+                data: JSON.stringify({ Input: { ImageData: imageData, ImageInfo:  JSON.parse( photData.ImageDetails) } }),
+                success: function (data) {
+                    var results = JSON.parse(data.d);
+                    
+                    if(results.result == "Success"){
+                        $("#divStatus").append(
+                            $("<p>").html("Image uploaded")                        
+                        );
+                        
+                        
+                
+                        for (var xC = 0; xC < syncOperationsLayer.InsertLayerFields.length; xC++) {
+                            if (syncOperationsLayer.InsertLayerFields[xC].Type == "FORM_PHOTO_V2") {
+                                if (syncOperationsLayer.InsertLayerFields[xC].ImageName == results.ImageName) {
+                                    syncOperationsLayer.InsertLayerFields[xC].Value = results.url;
+                                    xC = syncOperationsLayer.InsertLayerFields.length;
+                                }
+                            }
+                        }
+                        
+                        for(var xCC = 0; xCC < syncOperationsLayer.ChildData.length; xCC++)
+                            {
+                                for(var xC = 0; xC < syncOperationsLayer.ChildData[xCC].SyncArray.InsertLayerFields.length; xC++)
+                                {
+                                    if(syncOperationsLayer.ChildData[xCC].SyncArray.InsertLayerFields[xC].Type == "FORM_PHOTO_V2")
+                                    {
+                                        if(syncOperationsLayer.ChildData[xCC].SyncArray.InsertLayerFields[xC].ImageName == results.ImageName){
+                                            syncOperationsLayer.ChildData[xCC].SyncArray.InsertLayerFields[xC].Value = results.url;
+                                            
+                                            xCC = syncOperationsLayer.ChildData.length;
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        
+                    }
+                    else{
+                        $("<p>").html("Failed to upload image")  
+                    }
+
+
+                    //$('[act="ExecuteSync"]').attr("class", "btn blue");
+                    $("[lbl='SyncMessage']").html("Image Uploaded");
+                    ApplicationInformation.LastConnectedDate = Date();
+                    
+                    SyncImage();
+                }
+            }).fail(function (e) {
+                
+                
+                $('[act="ExecuteSync"]').removeAttr("disabled");
+                $('[act="ExecuteSync"]').attr("class", "btn blue");
+                $("#divStatus").html("<p><b>Failed to Upload Image</b></p><p>Could not connect to server for Sync. <br/>Please check your connection settings.</p>");
+                
+                SyncImage();
+            });
+                        
+                        
+                        } 
+                };
+            
+        }, function(tx, error) {
+                alert("Select failed...");
+          console.log('SELECT error: ' + error.message);
+        });
+      });
+
+        
+    }
+        catch(eee){
+            
+             FilterOption["Images"] = Array();
+            PerformSyncOperations();
+        
+        }
+    } 
+        
+    
+    
+     
+    function PerformSyncOperation() {
+        
+        iCurImage =-1;
+        $('[act="ExecuteSync"]').attr("class", "btn gray");
+        $("#divStatus").html("Processing... Please Wait...");
+        SyncImage();
+    }
+    
+    function PerformSyncOperations(){
+        
+        GetPosition();
+        try{
+        ApplicationInformation.DeviceInfo = device.manufacturer + " " + device.model + " (" + device.platform + ") :" + device.serial;
+        }
+        catch(e){
+        }
+        
+        $.ajax(
+        {
+            type: "POST",
+            dataType: 'json',
+            contentType: "application/json; charset=utf-8",
+            url: serverUrl + "WebServices/Offline/SyncService.asmx/PerformSyncV2",
+            data: JSON.stringify({ Input: syncOperationsLayer , _UserInfo: loggedinuser, _AppInfo: ApplicationInformation, _DevicePosition: DevicePosition }),
+            success: function (data) {
+                $("#divStatus").html("");
+                var results = JSON.parse(data.d);
+                $("#divStatus").append(
+                    $("<p>").append($("<b>").html("Sync Completed"))
+                ).append(
+                    $("<table>")
+                        .attr("class", "table")
+                        .append(
+                        $("<tr>")
+                            .append($("<td>").html("Number of Forms Effected"))
+                            .append($("<td>").html(results.RecordsInserted))
+                    )
+                ).append(
+                    $("<div>").html(results.sLog)
+                );
+
+
+                //$('[act="ExecuteSync"]').attr("class", "btn blue");
+                RecreateStorage();
+                OnLoad();
+                $("[lbl='SyncMessage']").html("");
+                ApplicationInformation.LastConnectedDate = Date();
+            }
+        }).fail(function () {
+            $("[lbl='SyncMessage']").html("");
+            $('[act="ExecuteSync"]').removeAttr("disabled");
+            $('[act="ExecuteSync"]').attr("class", "btn blue");
+            $("#divStatus").html("<p><b>Failed to Sync</b></p><p>Could not connect to server for Sync. <br/>Please check your connection settings.</p>");
+        });
+    
+    }
+
+
+
+    OnLoad();
+</script>

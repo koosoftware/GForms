@@ -1,0 +1,272 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1,user-scalable=no" />
+    <title>Offline TPK</title>
+    <link href="utils/bootstrap.min.css" rel="stylesheet" media="screen">
+    <link rel="stylesheet" href="utils/esri.css">
+    <style>
+        body {
+            background-color: #FFF;
+        }
+
+        #mapDiv {
+        }
+
+        .btn-file {
+            position: relative;
+            overflow: hidden;
+        }
+
+            .btn-file input[type=file] {
+                position: absolute;
+                top: 0;
+                right: 0;
+                min-width: 100%;
+                min-height: 100%;
+                font-size: 100px;
+                text-align: right;
+                filter: alpha(opacity=0);
+                opacity: 0;
+                background: red;
+                cursor: inherit;
+                display: block;
+            }
+
+        input[readonly] {
+            background-color: white !important;
+            cursor: text !important;
+        }
+
+        .container {
+        }
+
+        .blackBack {
+            color: #ffffff;
+            background-color: #000000;
+        }
+
+        .pad-top-20px {
+            padding-top: 20px;
+        }
+
+
+
+
+        .list {
+        }
+
+        .layer {
+            height: 100%;
+            width: 100%;
+            overflow: scroll;
+        }
+    </style>
+
+    <!--
+        Include a reference to IndexedDBShim for library to work on Safari 7.x.
+        May not be required for all Safari browsers.
+     -->
+    <!--<script src="//nparashuram.com/IndexedDBShim/dist/indexeddbshim.min.js"></script>-->
+
+</head>
+
+<body>
+    <div class="">
+
+        <!-- We provide two input types for demonstration purposes. Choose whichever one you want. -->
+
+        <div style="position:absolute; top:0px; left:0px; z-index:2000; width:100%; height:30px; background-color:#002776 !important" id='divHeader' class="list">
+            <h4 style="color:white;    padding: 0px;    padding-left: 20px;" lbl="Header">[Map Name]</h4>
+        </div>
+        <div style="position:absolute; top:30px; right:0px; z-index:900000; height:95px; width:250px; padding:5px;"><div id='divLayerList'></div></div>
+        <div id="mapDiv" style="height:100%; width:100%; position:absolute; top:30px;"></div>
+    </div>
+
+    <!-- Bootstrap core JavaScript
+    ================================================== -->
+    <!-- Placed at the end of the document so the pages load faster -->
+    <script src="utils/jq.min.js"></script>
+    <script src="utils/bootstrap.js"></script>
+    <script src="utils/init.js"></script>
+
+    <script>
+
+        mapData = JSON.parse($('#mapData', window.parent.document).attr("mapData"));
+        var coodx = $('#mapData', window.parent.document).attr("coordX");
+        var coody = $('#mapData', window.parent.document).attr("coordY");
+
+
+        function DownloadMap() {
+
+        }
+
+
+        // Make sure to reference the tpk library within the require statement!
+        require([
+            "esri/layers/ArcGISDynamicMapServiceLayer",
+            "esri/map",
+            "dojo/on",
+            "esri/graphic",
+            "esri/layers/GraphicsLayer",
+            "esri/geometry/Point",
+            "esri/symbols/SimpleFillSymbol",
+
+
+            "utils/offline-tpk-min.js", "dojo/domReady!"],
+            function (ArcGISDynamicMapServiceLayer, Map, on, Graphic, GraphicsLayer, Point, SimpleFillSymbol) {
+                
+                var map;
+                var fileInput, fileInputField;
+                
+                $("[lbl='Header']").html(mapData.mapName);
+
+                for (var iMap = 0; iMap < mapData.offlineMaps.length; iMap++) {
+                    $("#divLayerList").append(
+                        $("<div>")
+                            .append(
+                            $("<b>").html(mapData.offlineMaps[iMap].name)
+                            )
+                            .append(
+                            $("<div>")
+                                .attr("status", "lyr" + iMap)
+                                .html("Preping map...")
+                            )
+                    );
+                    getTPK(mapData.offlineMaps[iMap].url, "lyr" + iMap);
+                }
+
+
+                $("#mapDiv").css("height", $(window.parent).height() + "px");
+                map = new esri.Map("mapDiv"); //BootstrapMap.create("mapDiv",{});
+
+
+
+                
+
+
+                window.parent.window.Point = Point;
+                window.parent.window.GraphicsLayer = GraphicsLayer;
+                window.parent.window.SimpleFillSymbol = SimpleFillSymbol;
+                window.parent.window.Graphic = Graphic;
+
+                for (var iMap = 0; iMap < mapData.onlineMaps.length; iMap++) {
+                    var dynamicMapServiceLayer = new ArcGISDynamicMapServiceLayer(mapData.onlineMaps[iMap].url, {});
+                    map.addLayer(dynamicMapServiceLayer);
+
+                    $("#divLayerList").append(
+                        $("<div>")
+                            .attr("status", "lyronline" + iMap)
+                            .html("<b>" + mapData.onlineMaps[iMap].name + "</b>")
+                    );
+
+                }
+
+                window.parent.mapBase = this;
+
+
+                if (coodx == "0")
+                    console.log("COORD ISSUNUE");//;alert("Unable to locate device position.");
+
+                else {
+                    var gLayer = new GraphicsLayer();
+                    map.addLayer(gLayer);
+                    var symbol = new SimpleFillSymbol();
+                    const markerSymbol = {
+                        type: "simple-marker", // autocasts as new SimpleMarkerSymbol()
+                        color: [226, 119, 40],
+                        outline: {
+                            // autocasts as new SimpleLineSymbol()
+                            color: [255, 255, 255],
+                            width: 2
+                        }
+                    };
+
+
+                    gLayer.add(new Graphic(new Point(coody, coodx), markerSymbol));
+                    map.centerAndZoom(new Point(coody, coodx), 2);
+                }
+
+                window.parent.window.map = map;
+
+
+
+                // Retrieve the TPK file via an HTTP request
+                function getTPK(url, id) {
+
+
+                    var xhrRequest = new XMLHttpRequest();
+                    xhrRequest.open("GET", url, true);
+                    xhrRequest.responseType = "blob";
+                    xhrRequest.onprogress = function (evt) {
+                        var percent = 0;
+
+                        if ("total" in evt) {
+                            percent = (parseFloat(evt.loaded / evt.total) * 100).toFixed(0);
+                        }
+                        else {
+                            percent = (parseFloat(evt.loaded / evt.totalSize) * 100).toFixed(0);
+                        }
+                        $("[status='" + id + "']").html("Downloading... " + percent + "%");
+
+                    }
+
+                    xhrRequest.error = function (err) {
+                        console.log("ERROR retrieving TPK file: " + err.toString());
+                        alert("There was a problem retrieve the file.");
+                    }
+
+                    xhrRequest.onload = function (oEvent) {
+                        if (this.status == 200) {
+                            $("[status='" + id + "']").html("Remote tpk download finished.");
+                            zipParser(this.response);
+                        }
+                        else {
+                            $("[status='" + id + "']").html("There was a problem loading the file. " + this.status + ": " + this.statusText);
+                        }
+                    };
+
+                    xhrRequest.send();
+                }
+
+                // Parse the zip file contents into a zip.Entries object
+                function zipParser(blob) {
+
+                    O.esri.zip.createReader(new O.esri.zip.BlobReader(blob), function (zipReader) {
+                        zipReader.getEntries(function (entries) {
+                            initMap(entries);
+
+                            zipReader.close(function (evt) {
+                                console.log("Done reading zip file.")
+                            })
+                        }, function (err) {
+                            alert("There was a problem reading the file!: " + err);
+                        })
+                    })
+                }
+
+                // Initialize the Map and the TPKLayer
+                function initMap(entries) {
+
+                    //Destroy the old map so we can reload a new map
+                    /*if(tpkLayer != null){
+                        map.removeLayer(tpkLayer);
+                        map.destroy();
+                        tpkLayer = null;
+                    }*/
+
+
+                    var tpkLayer = new O.esri.TPK.TPKLayer();
+                    tpkLayer.extend(entries);
+                    map.addLayer(tpkLayer);
+
+
+
+                }
+
+            }
+        );
+    </script>
+</body>
+</html>

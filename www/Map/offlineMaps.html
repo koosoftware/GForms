@@ -1,0 +1,158 @@
+<div style="padding:20px; background-color:white">
+    <div class=""><p><b>Device Maps</b></p></div>
+    <div class="">
+        <table class="table">
+            <thead>
+            <th>Map Name</th>
+            <th>Status</th>
+            <th>Action</th></thead>
+            <tbody id="devMaps"></tbody>
+        </table>
+    </div>
+</div>
+
+
+<script>
+
+    GetPosition();
+    var mapData = FormSet.applications[global_applicationid].MapViewerJSON;
+    if (mapData == undefined || mapData == "")
+        mapData = { maps: [] };
+    else
+        mapData = JSON.parse(mapData);
+    /*
+    {
+            maps:[
+                {
+                    mapName:"Sishen Mine",
+                    onlineMaps:[
+                        { url:"https://ghprodsrv03.giscoe.com/arcgis/rest/services/Windeed/WDEED_Cadastre_201712071/MapServer", status:"pending", lastUpdate:-1, name:'Base map one', dataNode:"" } ,
+    { url:"https://ghprodsrv03.giscoe.com/arcgis/rest/services/Windeed/WDEED_CadastreSearch_201712071/MapServer", name:'World Basemap' }
+
+                    ],
+                    offlineMaps:[
+                        { url:"https://ghprodsrv03.giscoe.com/GiscoeInternalSystem/GFORMS/Map/Anglo_MWDSMS.tpk.zip", status:"pending", lastUpdate:-1, name:'Sishen Offline Base', dataNode:"" }
+    ],
+                    forms:[
+                        { formID:1, formName:"GWork" }
+                    ]
+                }
+            ]
+        };
+    */
+
+    // find the index of the application
+
+
+    function OfflineMapsLoad() {
+
+        for (iC = 0; iC < mapData.maps.length; iC++) {
+
+            $("#devMaps").append(
+                $("<tr>")
+                    .append($("<td>").html(mapData.maps[iC].mapName))
+
+                    .append($("<td>").html("Downloaded"))
+                    .append($("<td>").append($("<a>").attr("href", "#").attr("mapIndex", iC).on({
+                        click: function () {
+
+
+
+
+                            window.activeMap = parseInt($(this).attr("mapIndex"));
+                            var c = $("<div>")
+                                .append($("<iframe>")
+                                    .attr("id", "mapData")
+                                    .attr("mapData", JSON.stringify(mapData.maps[window.activeMap]))
+                                    .attr("coordX", DevicePosition.coords.latitude)
+                                    .attr("coordY", DevicePosition.coords.longitude)
+                                    .attr("width", $("body").css("width"))
+                                    .attr("height", $("body").css("height"))
+                                    .css("width", $("body").css("width"))
+                                    .css("height", $("body").css("height"))
+                                    .attr("src", "map/tpk-layer.html?v=1")
+                                    .html("Loading...")
+                                ).append(
+                                $("<button>")
+                                    .html("<i class='fa fa-search' /> ")
+                                    .addClass("btn btn-primary")
+                                    .attr("type", "button")
+                                    .css("position", "absolute")
+                                    .css("top", "130px")
+                                    .css("left", "20px")
+                                    .on({
+                                        click: function () {
+                                            GetPosition();
+
+                                            var gLayer = new window.GraphicsLayer();
+                                            window.map.addLayer(gLayer);
+                                            var symbol = new window.SimpleFillSymbol();
+                                            const markerSymbol = {
+                                                type: "simple-marker", // autocasts as new SimpleMarkerSymbol()
+                                                color: [226, 119, 40],
+                                                outline: {
+                                                    // autocasts as new SimpleLineSymbol()
+                                                    color: [255, 255, 255],
+                                                    width: 2
+                                                }
+                                            };
+
+                                            gLayer.add(new window.Graphic(new Point(DevicePosition.coords.latitude, DevicePosition.coords.longitude), markerSymbol));
+
+
+                                            window.map.centerAndZoom(new window.Point(DevicePosition.coords.longitude, DevicePosition.coords.latitude));
+                                        }
+                                    })
+                                ).append(
+                                $("<button>")
+                                    .html("<i class='fa fa-pencil-square' /> ")
+                                    .addClass("btn btn-primary")
+                                    .attr("type", "button")
+                                    .css("position", "absolute")
+                                    .css("top", "165px")
+                                    .css("left", "20px")
+                                    .on({
+                                        click: function () {
+
+
+                                            var forms = "<div>";
+
+
+                                            for (iF = 0; iF < mapData.maps[window.activeMap].forms.length; iF++) {
+
+                                                var formIndex = -1;
+                                                for (iFormID = 0; iFormID < FormSet.applications[global_applicationid].forms.length; iFormID++) {
+                                                    if (mapData.maps[window.activeMap].forms[iF].formID == FormSet.applications[global_applicationid].forms[iFormID].FormSysID) {
+                                                        formIndex = iFormID;
+                                                        break;
+                                                    }
+                                                }
+                                                forms += "<button class='btn btn-primary' onclick='Loadtestform()'><i class='fa fa-user'/>&nbsp;<span>" + mapData.maps[window.activeMap].forms[iF].formName + (formIndex == -1 ? "(NA)" : "<i class='fa fa-check'/>") + "</span></button>";
+                                            }
+
+                                            GetPosition();
+                                            // Open the forms list
+                                            $('#ProcessContent').html("Avaliable Forms<hr/>" + forms);
+                                            $("#dialog").dialog();
+
+                                        }
+                                    }));
+                            $("#SyncPanel").html('');
+                            $("#SyncPanel").append(c);
+                        }
+                    }
+                    ).html("Map")))
+            );
+        }
+    }
+
+
+    function LoadMapForm(index) {
+        page = index
+        $(".panel").hide();
+        $("#FORM_" + FormSet.applications[global_applicationid].forms[page].FormID).show();
+        LoadController(index);
+        $(".ui-icon-closethick").trigger("click")
+    }
+    OfflineMapsLoad();
+</script>
