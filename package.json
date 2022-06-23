@@ -25,17 +25,22 @@
     "cordova-plugin-geolocation": "~2.4.3",
     "cordova-sqlite-ext": "^6.0.0",
     "cordova-sqlite-storage": "^0.8.5",
-    "phonegap-plugin-barcodescanner": "~4.1.0",
-    "cordova-windows": "4.4.2"
+    "cordova-windows": "4.4.2",
+    "phonegap-plugin-barcodescanner": "~4.1.0"
   },
   "cordova": {
     "plugins": {
       "cordova-plugin-barcodescanner": {},
-      "cordova-plugin-camera": {},
+      "cordova-plugin-camera": {
+        "CAMERA_USAGE_DESCRIPTION": " ",
+        "PHOTOLIBRARY_USAGE_DESCRIPTION": " "
+      },
       "cordova-plugin-compat": {},
       "cordova-plugin-device": {},
       "cordova-plugin-file": {},
-      "cordova-plugin-geolocation": {},
+      "cordova-plugin-geolocation": {
+        "GEOLOCATION_USAGE_DESCRIPTION": " "
+      },
       "cordova-sqlite-ext": {},
       "cordova-sqlite-storage": {},
       "phonegap-plugin-barcodescanner": {},
@@ -44,8 +49,8 @@
     },
     "platforms": [
       "android",
-      "windows"
+      "windows",
+      "ios"
     ]
-  },
-  "dependencies": {}
+  }
 }
