@@ -96,7 +96,7 @@
     <vs:platformSpecificValues>
         <vs:platformSpecificWidget platformName="windows" version="1.1.0.0" />
     </vs:platformSpecificValues>
-    <preference name="android-targetSdkVersion" value="29" />
+    <preference name="android-targetSdkVersion" value="30" />
     <plugin name="cordova-plugin-camera" spec="~2.4.1" />
     <preference name="BackupWebStorage" value="local" />
     <plugin name="cordova-sqlite-storage" spec="~0.8.5" />
